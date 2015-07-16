@@ -205,7 +205,7 @@ def main():
 
     save = QPushButton(icons.save, 'Save')
     save.setEnabled(False)
-    cancel = QPushButton(icons.close, 'Cancel')
+    cancel = QPushButton(icons.close, 'Close')
     actions_layout = QHBoxLayout()
     actions_layout.addWidget(QWidget(), 1)
     actions_layout.addWidget(save)
@@ -237,7 +237,7 @@ def main():
             for index in range(file_list.invisibleRootItem().childCount()):
                 item = file_list.invisibleRootItem().child(index)
                 agg_row(item)
-        for line in shown_lines:
+        for line in shown_lines.copy():
             line.hide()
         del shown_lines[:]
         shown_lines.extend(
@@ -433,6 +433,7 @@ def main():
                 raise AssertionError('Line has no item')
             editor.invisibleRootItem().removeChild(self.item)
             self.item = None
+            shown_lines.remove(self)
 
         def update(self):
             self.key = self.item.text(0)
@@ -443,9 +444,9 @@ def main():
             r = 0
             count = len(self.targets & selected_targets)
             total = len(selected_targets)
-            a = 255 * count / total
+            a = 64 + (191 * count / total)
             deleted = False
-            if a == 0:
+            if count == 0:
                 deleted = True
                 a = 255
                 r = 255
@@ -492,7 +493,6 @@ def main():
                     except:
                         pass
                 self.hide()
-                shown_lines.remove(self)
                 return
             for target in self.targets - self.original_targets:
                 target.lines.remove(self)
@@ -509,13 +509,17 @@ def main():
             self.original_targets = self.targets.copy()
             for target in targets:
                 if target not in self.targets:
-                    target.lines.remove(self)
-            if len(self.targets & selected_targets) == 0:
-                self.hide()
+                    try:
+                        target.lines.remove(self)
+                    except:
+                        pass
             self.new = False
             self.original_key = self.key
             self.original_val = self.val
-            self._refresh()
+            if len(self.targets & selected_targets) == 0:
+                self.hide()
+            else:
+                self._refresh()
 
     all_tags = collections.defaultdict(
         lambda: collections.defaultdict(
@@ -541,13 +545,16 @@ def main():
 
         def save(self):
             tags = collections.defaultdict(lambda: set())
-            for line in self.lines:
+            for line in self.lines.copy():
                 line.save()
+            for line in self.lines:
                 tags[line.key].add(line.val or None)
             self.path = polytaxis.set_tags(self.path, tags)
             self.filename = split_abs_path(self.path)[-1]
             self.item.setText(0, self.filename)
             self.set_title()
+            modified_lines.clear()
+            save.setEnabled(False)
 
         def set_title(self):
             new_title = 'ptmod: {}'.format(', '.join(target.filename for target in targets))
